@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频生成工作站</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- 主页面 - 项目列表 -->
+    <div id="homePage" class="page active">
+        <div class="container">
+            <header>
+                <h1>视频生成工作站</h1>
+                <div class="header-actions">
+                    <button class="btn-secondary" onclick="showPromptsManager()">管理提示词</button>
+                    <button class="btn-primary" onclick="showCreateProjectModal()">创建新项目</button>
+                </div>
+            </header>
+            
+            <div id="projectList" class="project-grid">
+                <!-- 项目卡片将动态插入这里 -->
+            </div>
+            
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <p>还没有项目</p>
+                <button class="btn-primary" onclick="showCreateProjectModal()">创建第一个项目</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工作区页面 -->
+    <div id="workspacePage" class="page">
+        <div class="workspace-container">
+            <header class="workspace-header">
+                <button class="btn-back" onclick="backToHome()">返回</button>
+                <h2 id="currentProjectName"></h2>
+                <div class="workspace-info">
+                    <span id="currentProjectPath"></span>
+                </div>
+                <div class="workspace-actions">
+                    <button class="btn-secondary" onclick="saveDraft()" title="保存当前工作状态">保存草稿</button>
+                    <button class="btn-secondary" onclick="openProjectDirectory()" title="打开当前项目所在文件夹">打开项目目录</button>
+                    <button class="btn-secondary" onclick="loadDraft()" title="加载保存的草稿">加载草稿</button>
+                    <button class="btn-secondary" onclick="clearDraft()" title="清空保存的草稿">清空草稿</button>
+                </div>
+            </header>
+            
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="copywriting">文案生成</button>
+                <button class="tab-btn" data-tab="tts">TTS合成</button>
+                <button class="tab-btn" data-tab="imageGeneration">图片生成</button>
+                <button class="tab-btn" data-tab="prompts">常用提示词</button>
+                <button class="tab-btn" data-tab="freeCreate">自由创作</button>
+            </div>
+            
+            <div class="tab-content">
+                <!-- 文案生成Tab -->
+                <div id="copywritingTab" class="tab-pane active">
+                    <div id="copywritingInput" class="input-section">
+                        <div class="card">
+                            <h3>生成视频文案</h3>
+                            <p class="hint">输入B站视频链接，AI将自动生成TTS文案和图像提示词</p>
+                            
+                            <div class="input-group">
+                                <label for="videoUrl">视频链接</label>
+                                <input 
+                                    type="text" 
+                                    id="videoUrl" 
+                                    placeholder="例如: https://www.bilibili.com/video/BVxxxxxxxxx"
+                                    class="input-field"
+                                >
+                            </div>
+                            
+                            <button class="btn-primary btn-large" onclick="generateCopywriting()">生成文案</button>
+                        </div>
+                    </div>
+                    
+                    <div id="copywritingResult" class="result-section" style="display: none;">
+                        <div class="result-header">
+                            <h3>文案生成完成</h3>
+                            <button class="btn-secondary" onclick="regenerateCopywriting()">重新生成</button>
+                        </div>
+                        
+                        <div class="result-grid">
+                            <div class="card">
+                                <div class="card-header-with-btn">
+                                    <h4>TTS文案</h4>
+                                    <button class="btn-secondary" onclick="copyAllTTSContent()">复制所有文案</button>
+                                </div>
+                                <div id="ttsContent" class="content-display"></div>
+                            </div>
+                            
+                            <div class="card">
+                                <h4>图像提示词</h4>
+                                <div id="imageContent" class="content-display"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+                        <div class="loading-spinner"></div>
+                        <p>正在生成文案...</p>
+                    </div>
+                </div>
+                
+                <!-- TTS合成Tab -->
+                <div id="ttsTab" class="tab-pane">
+                    <div class="card">
+                        <h3>TTS配置</h3>
+                        
+                        <div class="input-group">
+                            <label for="apiKey">API Key *</label>
+                            <input 
+                                type="text" 
+                                id="apiKey" 
+                                placeholder="输入API Key"
+                                class="input-field"
+                            >
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="promptAudioUrl">Prompt Audio URL *</label>
+                            <input 
+                                type="text" 
+                                id="promptAudioUrl" 
+                                placeholder="例如: https://example.com/audio.wav"
+                                class="input-field"
+                            >
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="promptText">Prompt Text *</label>
+                            <textarea 
+                                id="promptText" 
+                                placeholder="输入参考文本"
+                                class="input-field"
+                                rows="3"
+                            ></textarea>
+                        </div>
+                        
+                        <button class="btn-primary" onclick="saveTTSConfig()">保存配置</button>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>生成语音</h3>
+                        
+                        <div class="tts-mode-switch">
+                            <button class="mode-btn active" onclick="switchTTSMode('single')">单个生成</button>
+                            <button class="mode-btn" onclick="switchTTSMode('batch')">批量生成</button>
+                        </div>
+                        
+                        <!-- 单个生成模式 -->
+                        <div id="singleTTSMode" class="tts-mode-content">
+                            <div class="input-group">
+                                <label for="ttsInput">合成文本 *</label>
+                                <textarea 
+                                    id="ttsInput" 
+                                    placeholder="输入要合成的文本内容"
+                                    class="input-field"
+                                    rows="4"
+                                ></textarea>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="emoText">情感文本</label>
+                                <input 
+                                    type="text" 
+                                    id="emoText" 
+                                    placeholder="例如: 你吓死我了！你是鬼吗？"
+                                    class="input-field"
+                                >
+                                <small class="hint">可选，用于控制语音情感</small>
+                            </div>
+                            
+                            <button class="btn-primary btn-large" onclick="generateTTS()">生成语音</button>
+                        </div>
+                        
+                        <!-- 批量生成模式 -->
+                        <div id="batchTTSMode" class="tts-mode-content" style="display: none;">
+                            <div class="input-group">
+                                <label for="batchTTSInput">批量文本 *</label>
+                                <textarea 
+                                    id="batchTTSInput" 
+                                    placeholder="粘贴所有文本，每行一条（按回车分隔）"
+                                    class="input-field"
+                                    rows="8"
+                                ></textarea>
+                                <small class="hint">文本将按换行符自动切割成多个任务</small>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="batchEmoText">情感文本</label>
+                                <input 
+                                    type="text" 
+                                    id="batchEmoText" 
+                                    placeholder="例如: 你吓死我了！你是鬼吗？"
+                                    class="input-field"
+                                >
+                                <small class="hint">可选，应用到所有语音</small>
+                            </div>
+                            
+                            <button class="btn-primary btn-large" onclick="startBatchTTS()">开始批量生成</button>
+                            
+                            <div id="batchTaskList" style="display: none; margin-top: 1.5rem;">
+                                <h4 style="margin-bottom: 1rem;">生成任务列表</h4>
+                                <div id="batchTasks" class="batch-tasks"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>字幕生成</h3>
+                        <button class="btn-primary" onclick="openAsrTool()">打开字幕生成工具</button>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>文件管理</h3>
+                        <button class="btn-primary" onclick="openTTSFolder()">打开TTS文件夹</button>
+                    </div>
+                    
+                    <div id="ttsLoadingOverlay" class="loading-overlay" style="display: none;">
+                        <div class="loading-spinner"></div>
+                        <p id="ttsLoadingText">正在生成语音...</p>
+                    </div>
+                </div>
+                
+                <!-- 图片生成Tab -->
+                <div id="imageGenerationTab" class="tab-pane">
+                    <div class="image-generation-container">
+                        <!-- 小Tab切换 -->
+                        <div class="sub-tabs">
+                            <button class="sub-tab-btn active" data-subtab="character">角色立绘</button>
+                            <button class="sub-tab-btn" data-subtab="background">视频背景</button>
+                        </div>
+                        
+                        <!-- 角色立绘生成 -->
+                        <div id="characterSubTab" class="sub-tab-pane active">
+                            <!-- 上：纯文本生成 -->
+                            <div class="card image-generation-card">
+                                <h4>纯文本生成立绘</h4>
+                                <div class="image-gen-layout">
+                                    <div class="image-gen-input">
+                                        <div class="input-group">
+                                            <label for="characterName">角色名称 *</label>
+                                            <input 
+                                                type="text" 
+                                                id="characterName" 
+                                                placeholder="输入角色名称，用于文件保存"
+                                                class="input-field"
+                                            >
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="characterPrompt">生成提示词 *</label>
+                                            <textarea 
+                                                id="characterPrompt" 
+                                                placeholder="输入详细的角色立绘描述..."
+                                                class="input-field"
+                                                rows="4"
+                                            ></textarea>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="characterAspectRatio">宽高比（可选）</label>
+                                            <select id="characterAspectRatio" class="input-field">
+                                                <option value="">默认</option>
+                                                <option value="16:9">16:9</option>
+                                                <option value="1:1">1:1</option>
+                                                <option value="9:16">9:16</option>
+                                                <option value="4:3">4:3</option>
+                                                <option value="3:4">3:4</option>
+                                            </select>
+                                        </div>
+                                        <button class="btn-primary" id="btn-character-text-generate" onclick="generateCharacterImage('text')">生成立绘</button>
+                                    </div>
+                                    <div class="image-gen-preview">
+                                        <div id="characterResultDisplayText" class="image-result-display" style="display: none;">
+                                            <img id="characterResultImageText" src="" alt="生成的立绘">
+                                            <button class="image-copy-btn" onclick="copyImagePath('characterResultDisplayText')" title="复制路径">复制</button>
+                                            <input type="hidden" id="characterResultPathText">
+                                        </div>
+                                        <div id="characterResultPlaceholderText" class="image-result-placeholder">
+                                            <span>生成后显示预览</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 下：图片+文本生成 -->
+                            <div class="card image-generation-card">
+                                <h4>基于参考图生成立绘</h4>
+                                <div class="image-gen-layout">
+                                    <div class="image-gen-input">
+                                        <div class="input-group">
+                                            <label for="characterRefName">角色名称 *</label>
+                                            <input 
+                                                type="text" 
+                                                id="characterRefName" 
+                                                placeholder="输入角色名称，用于文件保存"
+                                                class="input-field"
+                                            >
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="characterRefImagePath">参考图片路径 *</label>
+                                            <input 
+                                                type="text" 
+                                                id="characterRefImagePath" 
+                                                placeholder="例如: C:\path\to\image.jpg"
+                                                class="input-field"
+                                            >
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="characterAddedPrompt">修改提示词 *</label>
+                                            <textarea 
+                                                id="characterAddedPrompt" 
+                                                placeholder="输入如何修改/优化参考图的描述..."
+                                                class="input-field"
+                                                rows="4"
+                                            ></textarea>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="characterRefAspectRatio">宽高比（可选）</label>
+                                            <select id="characterRefAspectRatio" class="input-field">
+                                                <option value="">默认</option>
+                                                <option value="16:9">16:9</option>
+                                                <option value="1:1">1:1</option>
+                                                <option value="9:16">9:16</option>
+                                                <option value="4:3">4:3</option>
+                                                <option value="3:4">3:4</option>
+                                            </select>
+                                        </div>
+                                        <button class="btn-primary" id="btn-character-ref-generate" onclick="generateCharacterImage('reference')">生成立绘</button>
+                                    </div>
+                                    <div class="image-gen-preview">
+                                        <div id="characterResultDisplayRef" class="image-result-display" style="display: none;">
+                                            <img id="characterResultImageRef" src="" alt="生成的立绘">
+                                            <button class="image-copy-btn" onclick="copyImagePath('characterResultDisplayRef')" title="复制路径">复制</button>
+                                            <input type="hidden" id="characterResultPathRef">
+                                        </div>
+                                        <div id="characterResultPlaceholderRef" class="image-result-placeholder">
+                                            <span>生成后显示预览</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 文件路径显示和打开文件夹 -->
+                            <div id="characterResultContainer" style="display: none;">
+                                <div class="card">
+                                    <h4>生成结果</h4>
+                                    <div class="result-actions">
+                                        <input type="text" id="characterImagePath" readonly class="input-field" style="flex: 1;">
+                                        <button class="btn-secondary" onclick="openCharacterImageFolder()">打开文件夹</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 视频背景生成 -->
+                        <div id="backgroundSubTab" class="sub-tab-pane">
+                            <!-- 上：纯文本生成 -->
+                            <div class="card image-generation-card">
+                                <h4>纯文本生成背景</h4>
+                                <div class="image-gen-layout">
+                                    <div class="image-gen-input">
+                                        <div class="input-group">
+                                            <label for="backgroundName">背景名称 *</label>
+                                            <input 
+                                                type="text" 
+                                                id="backgroundName" 
+                                                placeholder="输入背景名称，用于文件保存（如果留空则自动编号）"
+                                                class="input-field"
+                                            >
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="backgroundPrompt">生成提示词 *</label>
+                                            <textarea 
+                                                id="backgroundPrompt" 
+                                                placeholder="输入详细的背景场景描述..."
+                                                class="input-field"
+                                                rows="4"
+                                            ></textarea>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="backgroundAspectRatio">宽高比（可选）</label>
+                                            <select id="backgroundAspectRatio" class="input-field">
+                                                <option value="">默认</option>
+                                                <option value="16:9">16:9</option>
+                                                <option value="1:1">1:1</option>
+                                                <option value="9:16">9:16</option>
+                                                <option value="4:3">4:3</option>
+                                                <option value="3:4">3:4</option>
+                                            </select>
+                                        </div>
+                                        <button class="btn-primary" id="btn-background-text-generate" onclick="generateBackgroundImage('text')">生成背景</button>
+                                    </div>
+                                    <div class="image-gen-preview">
+                                        <div id="backgroundResultDisplayText" class="image-result-display" style="display: none;">
+                                            <img id="backgroundResultImageText" src="" alt="生成的背景">
+                                            <button class="image-copy-btn" onclick="copyImagePath('backgroundResultDisplayText')" title="复制路径">复制</button>
+                                            <input type="hidden" id="backgroundResultPathText">
+                                        </div>
+                                        <div id="backgroundResultPlaceholderText" class="image-result-placeholder">
+                                            <span>生成后显示预览</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 下：多图+文本生成 -->
+                            <div class="card image-generation-card">
+                                <h4>基于参考图生成背景</h4>
+                                <div class="image-gen-layout">
+                                    <div class="image-gen-input">
+                                        <div class="input-group">
+                                            <label for="backgroundRefName">背景名称 *</label>
+                                            <input 
+                                                type="text" 
+                                                id="backgroundRefName" 
+                                                placeholder="输入背景名称，用于文件保存（如果留空则自动编号）"
+                                                class="input-field"
+                                            >
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="backgroundRefImagePaths">参考图片路径（支持多个，每行一个） *</label>
+                                            <textarea 
+                                                id="backgroundRefImagePaths" 
+                                                placeholder="例如:\nC:\path\to\image1.jpg\nC:\path\to\image2.jpg"
+                                                class="input-field"
+                                                rows="4"
+                                            ></textarea>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="backgroundAddedPrompt">修改提示词 *</label>
+                                            <textarea 
+                                                id="backgroundAddedPrompt" 
+                                                placeholder="输入如何修改/优化参考图的描述..."
+                                                class="input-field"
+                                                rows="4"
+                                            ></textarea>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="backgroundRefAspectRatio">宽高比（可选）</label>
+                                            <select id="backgroundRefAspectRatio" class="input-field">
+                                                <option value="">默认</option>
+                                                <option value="16:9">16:9</option>
+                                                <option value="1:1">1:1</option>
+                                                <option value="9:16">9:16</option>
+                                                <option value="4:3">4:3</option>
+                                                <option value="3:4">3:4</option>
+                                            </select>
+                                        </div>
+                                        <button class="btn-primary" id="btn-background-ref-generate" onclick="generateBackgroundImage('reference')">生成背景</button>
+                                    </div>
+                                    <div class="image-gen-preview">
+                                        <div id="backgroundResultDisplayRef" class="image-result-display" style="display: none;">
+                                            <img id="backgroundResultImageRef" src="" alt="生成的背景">
+                                            <button class="image-copy-btn" onclick="copyImagePath('backgroundResultDisplayRef')" title="复制路径">复制</button>
+                                            <input type="hidden" id="backgroundResultPathRef">
+                                        </div>
+                                        <div id="backgroundResultPlaceholderRef" class="image-result-placeholder">
+                                            <span>生成后显示预览</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 文件路径显示和打开文件夹 -->
+                            <div id="backgroundResultContainer" style="display: none;">
+                                <div class="card">
+                                    <h4>生成结果</h4>
+                                    <div class="result-actions">
+                                        <input type="text" id="backgroundImagePath" readonly class="input-field" style="flex: 1;">
+                                        <button class="btn-secondary" onclick="openBackgroundImageFolder()">打开文件夹</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="imageGenerationLoadingOverlay" class="loading-overlay" style="display: none;">
+                        <div class="loading-spinner"></div>
+                        <p id="imageGenerationLoadingText">正在生成图像...</p>
+                    </div>
+                </div>
+
+                <!-- 常用提示词Tab -->
+                <div id="promptsTab" class="tab-pane">
+                    <div class="prompts-container">
+                        <div class="prompts-header">
+                            <h3>常用提示词</h3>
+                            <button class="btn-primary" onclick="showPromptsManager()">管理提示词</button>
+                        </div>
+                        <div id="promptsList" class="prompts-list"></div>
+                        <div id="emptyPrompts" class="empty-state" style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                            <p>还没有保存提示词</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 自由创作Tab -->
+                <div id="freeCreateTab" class="tab-pane">
+                    <div class="free-create-container">
+                        <div class="free-create-header">
+                            <div class="free-create-title-group">
+                                <div>
+                                    <h3>自由创作图片</h3>
+                                    <p class="hint">支持文字生成图片、上传参考图、剪切板粘贴，自由创作你想要的图片</p>
+                                </div>
+                                <button class="btn-secondary" onclick="resetFreeCreate()" title="清空所有输入，开始新的创作">
+                                    清空重置
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="free-create-layout">
+                            <!-- 左侧：输入区域 -->
+                            <div class="free-create-input">
+                                <div class="card">
+                                    <h4>提示词</h4>
+                                    <div class="input-group">
+                                        <label for="freeCreatePrompt">描述你想生成的图片 *</label>
+                                        <textarea 
+                                            id="freeCreatePrompt" 
+                                            placeholder="例如：一个美丽的日落海滩场景，温暖的橙色天空，平静的海浪..."
+                                            class="input-field"
+                                            rows="6"
+                                        ></textarea>
+                                    </div>
+                                </div>
+
+                                <div class="card">
+                                    <h4>参考图片（可选）</h4>
+                                    <div class="input-group">
+                                        <div class="reference-images-controls">
+                                            <button class="btn-secondary" onclick="freeCreateUploadImages()">
+                                                <span>选择图片</span>
+                                            </button>
+                                            <button class="btn-secondary" onclick="freeCreatePasteFromClipboard()">
+                                                <span>从剪切板粘贴</span>
+                                            </button>
+                                            <span class="hint-text">支持多张图片作为参考</span>
+                                        </div>
+                                        <input 
+                                            type="file" 
+                                            id="freeCreateImageInput" 
+                                            accept="image/*" 
+                                            multiple 
+                                            style="display: none;"
+                                            onchange="handleFreeCreateImageSelect(event)"
+                                        >
+                                        <div id="freeCreateReferencePreview" class="reference-preview-grid"></div>
+                                    </div>
+                                </div>
+
+                                <div class="card">
+                                    <h4>生成设置</h4>
+                                    <div class="input-group">
+                                        <label for="freeCreateAspectRatio">图片比例</label>
+                                        <select id="freeCreateAspectRatio" class="input-field">
+                                            <option value="">自动</option>
+                                            <option value="1:1">1:1 (正方形)</option>
+                                            <option value="16:9">16:9 (横屏)</option>
+                                            <option value="9:16">9:16 (竖屏)</option>
+                                            <option value="4:3">4:3 (标准横屏)</option>
+                                            <option value="3:4">3:4 (标准竖屏)</option>
+                                            <option value="21:9">21:9 (超宽屏)</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="freeCreateSaveFolder">保存文件夹（可选）</label>
+                                        <div class="folder-input-group">
+                                            <input 
+                                                type="text" 
+                                                id="freeCreateSaveFolder" 
+                                                placeholder="留空则保存到项目根目录/free-create"
+                                                class="input-field"
+                                            >
+                                            <button class="btn-icon" onclick="browseFolderForFreeCreate()" title="浏览文件夹">
+                                                ...
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <button class="btn-primary btn-large" onclick="generateFreeCreateImage()" id="btnFreeCreateGenerate">
+                                        <span>生成图片</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- 右侧：预览和历史 -->
+                            <div class="free-create-preview">
+                                <div class="card">
+                                    <h4>生成预览</h4>
+                                    <div id="freeCreateResultDisplay" class="free-create-result">
+                                        <div class="result-placeholder">
+                                            <p>生成的图片将在这里显示</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card">
+                                    <div class="card-header-with-btn">
+                                        <h4>生成历史</h4>
+                                        <button class="btn-secondary btn-small" onclick="clearFreeCreateHistory()">清空</button>
+                                    </div>
+                                    <div id="freeCreateHistory" class="free-create-history">
+                                        <div class="empty-state">
+                                            <p>还没有生成记录</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建项目模态框 -->
+    <div id="createProjectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>创建新项目</h3>
+                <button class="close-btn" onclick="closeCreateProjectModal()">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="projectName">项目名称 *</label>
+                    <input 
+                        type="text" 
+                        id="projectName" 
+                        placeholder="输入项目名称"
+                        class="input-field"
+                    >
+                </div>
+                
+                <div class="input-group">
+                    <label for="projectPath">保存路径 *</label>
+                    <input 
+                        type="text" 
+                        id="projectPath" 
+                        placeholder="例如: C:\Projects\MyVideo"
+                        class="input-field"
+                    >
+                    <small class="hint">请输入完整的文件夹路径</small>
+                </div>
+                <div class="input-group">
+                    <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="useDefaultTTSConfig" checked>
+                        使用默认TTS配置
+                    </label>
+                    
+                    <small class="hint">默认值来自 env.yaml（TTS-API-KEY、TTS-Prompt-Audio-URL、TTS-Prompt-Text）</small>
+                </div>
+
+                <div class="input-group">
+                    <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="useDefaultProjectPath" checked>
+                        自动填入保存路径 *
+                    </label>
+                    <small class="hint">默认根目录来自 env.yaml（Default-Project-Root），将与项目名称组合生成路径</small>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeCreateProjectModal()">取消</button>
+                <button class="btn-primary" onclick="createProject()">创建项目</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知提示 -->
+    <div id="notification" class="notification"></div>
+
+    <!-- 提示词管理模态框 -->
+    <div id="promptsManagerModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>管理常用提示词</h3>
+                <button class="close-btn" onclick="closePromptsManager()">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="promptTitle">提示词名称 *</label>
+                    <input 
+                        type="text" 
+                        id="promptTitle" 
+                        placeholder="请输入提示词名称..."
+                        class="input-field"
+                    >
+                </div>
+                
+                <div class="input-group">
+                    <label for="promptContent">提示词内容 *</label>
+                    <textarea 
+                        id="promptContent" 
+                        placeholder="输入详细的提示词内容..."
+                        class="input-field"
+                        rows="4"
+                    ></textarea>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closePromptsManager()">取消</button>
+                <button class="btn-primary" onclick="saveGlobalPrompt()">保存提示词</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 已保存提示词显示模态框 -->
+    <div id="globalPromptsModal" class="modal">
+        <div class="modal-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3>全局常用提示词</h3>
+                <button class="close-btn" onclick="closeGlobalPromptsModal()">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <div id="globalPromptsList" class="prompts-list"></div>
+                <div id="emptyGlobalPrompts" class="empty-state" style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                    <p>还没有保存提示词</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

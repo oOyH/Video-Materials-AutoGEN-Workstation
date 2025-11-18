@@ -1,0 +1,26 @@
+{
+  "name": "video-workstation",
+  "version": "1.0.0",
+  "description": "视频生成工作站 - 一个便捷的视频文案生成和管理工具",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "video",
+    "workstation",
+    "bilibili",
+    "copywriting"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}
+
+
