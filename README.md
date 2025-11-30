@@ -21,7 +21,19 @@
 ![界面 5](img/5.png)
 ![界面 6](img/6.png)
 
-## 快速上手
+## 通过Docker 部署
+
+1. 复制配置：`cp env.example.yaml env.yaml`，填好各个 Key。容器内建议把 `Default-Project-Root` 设为 `/data/projects`（会被映射到本地 `./data` 目录，方便持久化）。
+2. 一键启动：`docker compose up -d --build`。首次会自动构建。
+3. 打开 `http://localhost:8765` 使用。查看日志可用 `docker compose logs -f video-workstation`。
+4. 容器是无桌面环境，“打开项目目录/打开TTS文件夹”等按钮不会弹出文件管理器，接口会直接返回路径；请在宿主机手动进入对应目录（默认挂载在当前仓库的 `./data`）。
+
+> node如果拉不下来，推荐先使用 `docker pull node:20-alpine` , 再运行 `docker compose up -d --build` 
+
+如果不想用 Compose，也可以用单条命令运行镜像（需要先 `docker build -t video-workstation .`）：
+`docker run -d -p 8765:8765 -v $(pwd)/env.yaml:/app/env.yaml:ro -v $(pwd)/data:/data --name video-workstation video-workstation`
+
+## 通过源码部署
 
 1. 复制 `env.example.yaml` 为 `env.yaml`，填入自己的 Gemini Key、Base URL、模型、TTS Key 与提示词等配置，否则无法调用接口。
 2. （可选）在 `env.yaml` 中设置 `Default-Project-Root`，用于存放自动生成的脚本、音频与图片文件。
